@@ -1,0 +1,14 @@
+.idea
+.vscode
+
+.env
+.venv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Cache disque (AniDB, etc.)
+cache/

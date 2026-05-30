@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+.venv
+.env
+docs
+**/__pycache__
+*.egg-info
+*.pyc
