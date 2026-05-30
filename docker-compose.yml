@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: episode_id_map_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-episode_id_map}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-episode_id_map}
+      POSTGRES_DB: ${POSTGRES_DB:-episode_id_map}
+    ports:
+      # Hôte configurable (port 5432 souvent déjà pris sous Windows → mettre 5433).
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-episode_id_map} -d ${POSTGRES_DB:-episode_id_map}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: episode_id_map_app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Dans le réseau Docker, la base est joignable via le nom de service "db".
+      DATABASE_URL: postgresql://${POSTGRES_USER:-episode_id_map}:${POSTGRES_PASSWORD:-episode_id_map}@db:5432/${POSTGRES_DB:-episode_id_map}
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests          # montés pour exécuter pytest dans le conteneur
+      - ./cache:/app/cache          # cache disque persistant (AniDB anti-ban)
+    # Par défaut : smoke test d'infra. Pour les fetchers (ÉTAPE 3), voir README :
+    #   docker compose run --rm --no-deps app python -m episode_id_map.cli <source> ...
+    command: ["python", "-m", "episode_id_map"]
+
+volumes:
+  pgdata:

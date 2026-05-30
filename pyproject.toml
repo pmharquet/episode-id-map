@@ -1,0 +1,30 @@
+[project]
+name = "episode-id-map"
+version = "0.1.0"
+description = "Mapping des identifiants d'épisodes d'anime entre MAL, SIMKL, TMDB, TVDB et AniDB."
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "tenacity>=8.2",
+    "typer>=0.12",
+    "structlog>=24.1",
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "respx>=0.21",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
