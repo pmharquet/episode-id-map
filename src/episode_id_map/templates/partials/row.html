@@ -40,7 +40,15 @@ ea:        {{ row.episode_absolute }}{% endset %}
 
 <tr id="r-{{ ea8 }}" class="hover:bg-slate-900/40">
   <td class="px-3 py-1.5">{{ badge(g.source_count) }}</td>
-  <td class="px-3 py-1.5 font-mono text-xs text-slate-500" title="{{ g.episode_absolute }}">{{ ea8 }}…</td>
+  <td class="px-3 py-1.5 font-mono text-xs text-slate-500 whitespace-nowrap" title="{{ g.episode_absolute }}">
+    {{ ea8 }}…
+    <button class="ml-1 text-red-500 opacity-30 hover:opacity-100 text-xs font-bold cursor-pointer bg-transparent border-0 leading-none align-middle"
+            hx-post="/rows/delete-group"
+            hx-vals='{"episode_absolute":"{{ g.episode_absolute }}"}'
+            hx-target="#r-{{ ea8 }}"
+            hx-swap="outerHTML"
+            title="Supprimer tout le groupe">×</button>
+  </td>
   {{ src_cell("ANIDB", "Ep " ~ g.anidb_ep if g.anidb_ep else "—") }}
   {{ src_cell("MAL",   "Ep " ~ g.mal_ep   if g.mal_ep   else "—") }}
   {{ src_cell("SIMKL", g.simkl_ep          if g.simkl_ep else "—") }}

@@ -83,6 +83,14 @@ def series_list_partial(request: Request) -> HTMLResponse:
     return _r(request, "partials/series_list.html", {"series_list": series_list})
 
 
+@app.post("/rows/delete-group", response_class=HTMLResponse)
+def delete_group(episode_absolute: str = Form(...)) -> HTMLResponse:
+    s = _get_settings()
+    with connect(s) as conn:
+        queries.delete_group(conn, episode_absolute)
+    return HTMLResponse("")   # la <tr> est remplacée par rien → disparaît
+
+
 @app.post("/rows/delete", response_class=HTMLResponse)
 def delete_row(
     request: Request,

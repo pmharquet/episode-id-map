@@ -167,3 +167,13 @@ def delete_row(conn, uuid: str) -> None:
     with conn.cursor() as cur:
         cur.execute("DELETE FROM episode_id_map WHERE uuid = %s", (uuid,))
     conn.commit()
+
+
+def delete_group(conn, episode_absolute: str) -> None:
+    """Supprime toutes les lignes d'un groupe (tous les sources)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM episode_id_map WHERE episode_absolute = %s",
+            (episode_absolute,),
+        )
+    conn.commit()
