@@ -18,6 +18,7 @@ import typer
 
 from . import logging as logmod
 from .config import Settings
+from .ingest import ingest as run_ingest
 from .sources.anidb import AniDBClient
 from .sources.jikan import JikanClient
 from .sources.simkl import SimklClient
@@ -105,6 +106,14 @@ def anidb(aid: int, force: bool = False) -> None:
         episodes = c.regular_episodes(root)
         typer.echo(f"{len(episodes)} épisodes réguliers (type=1)")
         _dump(episodes)
+
+
+@app.command()
+def ingest(mal_id: int) -> None:
+    """Ingestion complète d'une œuvre (cluster) → table episode_id_map."""
+    logmod.configure()
+    stats = run_ingest(mal_id, settings=Settings.load())
+    typer.echo(json.dumps(stats, indent=2))
 
 
 if __name__ == "__main__":
