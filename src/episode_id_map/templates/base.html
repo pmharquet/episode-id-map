@@ -30,27 +30,18 @@
     table { font-size: 0.82rem; }
     td, th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
     td.mono { font-family: monospace; font-size: 0.75rem; color: var(--pico-muted-color); }
-    /* Cellules source : flex pour centrer label + bouton, pas d'ellipsis */
-    td.ep {
-      display: flex; align-items: center; justify-content: center; gap: 5px;
-      overflow: visible; text-overflow: clip; max-width: none;
-    }
+    td.ep { text-align: center; }
     td.ep.present { color: var(--pico-color); }
-    td.ep.absent  { color: var(--pico-muted-color); justify-content: center; }
+    td.ep.absent { color: var(--pico-muted-color); }
     /* Alert */
     .alert { padding: 0.75rem 1rem; border-radius: var(--pico-border-radius); margin-top: 0.75rem; }
     .alert-success { background: #14532d; border: 1px solid #166534; }
     .alert-error   { background: #450a0a; border: 1px solid #7f1d1d; }
-    /* ── Tooltip ligne brute ──
-       Trick : padding-bottom sur .tip étend la zone de hover jusqu'au tooltip
-       (top: 100% est au bas du padding, pas du contenu visuel).           */
-    .tip {
-      position: relative; cursor: help;
-      padding-bottom: 6px;   /* bridge le gap entre l'élément et le tooltip */
-    }
+    /* ── Tooltip ligne brute ── */
+    .tip { position: relative; cursor: help; }
     .tip::after {
       content: attr(data-tip);
-      position: absolute; left: 50%; top: 100%;  /* colle au bas du padding */
+      position: absolute; left: 50%; top: calc(100% + 4px);
       transform: translateX(-50%);
       background: #0f172a; border: 1px solid #334155;
       border-radius: 6px; padding: 8px 12px;
@@ -58,7 +49,7 @@
       line-height: 1.55; color: #cbd5e1;
       z-index: 200; min-width: 310px;
       opacity: 0; pointer-events: none;
-      transition: opacity 0.14s ease;
+      transition: opacity 0.12s ease;
       box-shadow: 0 4px 16px rgba(0,0,0,.5);
     }
     .tip:hover::after { opacity: 1; }
@@ -69,12 +60,12 @@
     /* ── Bouton supprimer ── */
     .del-btn {
       background: none; border: none; color: #ef4444;
-      cursor: pointer; font-size: 0.85rem; padding: 0;
-      opacity: 0.45; transition: opacity 0.1s;
-      flex-shrink: 0; line-height: 1;
-      font-family: sans-serif; font-weight: 700;
+      cursor: pointer; font-size: 0.9rem; padding: 0 4px;
+      opacity: 0.5; transition: opacity 0.1s;
+      line-height: 1;
     }
     .del-btn:hover { opacity: 1; }
+    td.del-cell { text-align: center; width: 22px; padding: 2px 4px; }
   </style>
 </head>
 <body>
