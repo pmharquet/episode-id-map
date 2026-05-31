@@ -1,4 +1,4 @@
-"""assign_absolute : les 4 cas de résolution sans table auxiliaire."""
+"""assign_absolute : résolution de l'episode_absolute par fréquence."""
 
 from __future__ import annotations
 
@@ -39,12 +39,30 @@ def test_reuses_single_existing() -> None:
     assert result == "ABS-1"  # le frère neuf hérite de l'ancre existante
 
 
-def test_conflict_picks_smallest_without_merging() -> None:
+def test_conflict_picks_most_frequent() -> None:
+    # ANIDB+MAL+SIMKL ont EA-A (count=3), TVDB a EA-X (count=1), TMDB a EA-Z (count=1).
+    # EA-A doit gagner : c'est l'ancre stable déjà partagée.
     cur = FakeCursor(
         {
-            ("ANIDB", "S", None, "1"): "ABS-b",
-            ("MAL", "S", None, "1"): "ABS-a",
+            ("ANIDB", "S", None, "1"): "EA-A",
+            ("MAL",   "S", None, "1"): "EA-A",
+            ("SIMKL", "S", None, "1"): "EA-A",
+            ("TVDB",  "S", None, "1"): "EA-X",
+            ("TMDB",  "S", None, "1"): "EA-Z",
         }
     )
-    result = assign_absolute(cur, [_view("ANIDB", "1"), _view("MAL", "1")])
-    assert result == "ABS-a"  # min ; pas de fusion destructive
+    group = [_view(s, "1") for s in ("ANIDB", "MAL", "SIMKL", "TVDB", "TMDB")]
+    assert assign_absolute(cur, group) == "EA-A"
+
+
+def test_conflict_equal_count_picks_smallest() -> None:
+    # Deux singletons, aucun n'est plus fréquent → plus petit UUID déterministe.
+    cur = FakeCursor(
+        {
+            ("TVDB", "S", None, "1"): "EA-b",
+            ("TMDB", "S", None, "1"): "EA-a",
+        }
+    )
+    group = [_view("ANIDB", "1"), _view("TVDB", "1"), _view("TMDB", "1")]
+    result = assign_absolute(cur, group)
+    assert result == "EA-a"  # plus petit parmi les deux singletons

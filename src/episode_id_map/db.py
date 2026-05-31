@@ -38,8 +38,13 @@ def fetch_episode_absolute(
 
 
 def upsert_row(cur: psycopg.Cursor, row: Row) -> None:
-    """Insère la ligne ; si la clé unique existe déjà, ne met à jour QUE `extra`
-    (on ne réécrit jamais `uuid` ni `episode_absolute` → stabilité)."""
+    """Insère ou met à jour la ligne.
+
+    Sur conflit de clé unique, on met à jour `episode_absolute` ET `extra`.
+    Mettre à jour `episode_absolute` permet de rattacher un singleton (ex. : TVDB
+    S2 écrit lors de l'ingest S1) à son groupe correct lors de l'ingest S2.
+    Le `uuid` (PK) n'est jamais modifié.
+    """
     cur.execute(
         """
         INSERT INTO episode_id_map
@@ -47,7 +52,9 @@ def upsert_row(cur: psycopg.Cursor, row: Row) -> None:
              id_series, id_season, id_episode, extra)
         VALUES (%s, %s, %s, NULL, %s, %s, %s, %s)
         ON CONFLICT (source, id_series, id_season, id_episode)
-        DO UPDATE SET extra = EXCLUDED.extra
+        DO UPDATE SET
+            episode_absolute = EXCLUDED.episode_absolute,
+            extra            = EXCLUDED.extra
         """,
         (
             row.uuid,
