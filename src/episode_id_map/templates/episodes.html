@@ -2,34 +2,32 @@
 {% block title %}Comparaison – Episode ID Map{% endblock %}
 
 {% block content %}
-<h2>Comparaison des épisodes</h2>
+<h2 class="text-xl font-semibold mb-5">Comparaison des épisodes</h2>
 
 {# ── Filtre série ── #}
-<div style="display:flex; gap:1rem; align-items:flex-end; margin-bottom:1rem; flex-wrap:wrap;">
-  <div style="flex:1; min-width:240px;">
-    <label for="mal_series">Anime (MAL id_series)</label>
+<div class="flex gap-3 items-end mb-4 flex-wrap">
+  <div class="flex-1 min-w-[240px]">
+    <label class="block text-xs text-slate-400 mb-1" for="mal_series">Anime (MAL id_series)</label>
     <select id="mal_series" name="mal_series"
             hx-get="/partials/episodes-table"
             hx-target="#episodes-table"
             hx-swap="innerHTML"
             hx-include="[name='mal_series']"
-            hx-trigger="change">
+            hx-trigger="change"
+            class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-600">
       <option value="">— Tous les anime —</option>
       {% for s in series_list %}
-      <option value="{{ s.mal_series }}"
-        {% if s.mal_series == selected %}selected{% endif %}>
-        MAL {{ s.mal_series }}
-        ({{ s.full_groups }}/{{ s.total_episodes }} complets)
+      <option value="{{ s.mal_series }}" {% if s.mal_series == selected %}selected{% endif %}>
+        MAL {{ s.mal_series }} ({{ s.full_groups }}/{{ s.total_episodes }} complets)
       </option>
       {% endfor %}
     </select>
   </div>
   {% if selected %}
-  <div>
-    <a href="/episodes" role="button" class="secondary outline">
-      Réinitialiser
-    </a>
-  </div>
+  <a href="/episodes"
+     class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded text-sm no-underline transition-colors">
+    Réinitialiser
+  </a>
   {% endif %}
 </div>
 

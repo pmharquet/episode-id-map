@@ -1,16 +1,16 @@
 {% if success %}
-<div class="alert alert-success">
-  <strong>✅ Ingestion réussie</strong> — MAL {{ mal_id }}<br>
-  {{ stats.groups }} groupes · {{ stats.rows }} lignes écrites
-  <br>
-  <a href="/episodes?mal_series={{ mal_id }}" style="font-size:0.85rem;">
-    → Voir la comparaison
-  </a>
+<div class="bg-green-950 border border-green-800 rounded-lg px-4 py-3 text-sm">
+  <strong class="text-green-300">✅ Ingestion réussie</strong>
+  <span class="text-slate-300"> — MAL {{ mal_id }}</span><br>
+  <span class="text-slate-400">{{ stats.groups }} groupes · {{ stats.rows }} lignes écrites</span><br>
+  <a href="/episodes?mal_series={{ mal_id }}"
+     class="text-blue-400 hover:text-blue-300 no-underline text-xs mt-1 inline-block">→ Voir la comparaison</a>
 </div>
 <script>document.body.dispatchEvent(new Event("ingestDone"));</script>
 {% else %}
-<div class="alert alert-error">
-  <strong>❌ Erreur</strong> — MAL {{ mal_id }}<br>
-  <code>{{ error }}</code>
+<div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm">
+  <strong class="text-red-400">❌ Erreur</strong>
+  <span class="text-slate-300"> — MAL {{ mal_id }}</span><br>
+  <code class="text-red-300 text-xs">{{ error }}</code>
 </div>
 {% endif %}

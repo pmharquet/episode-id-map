@@ -2,49 +2,49 @@
 {% block title %}Dashboard – Episode ID Map{% endblock %}
 
 {% block content %}
-<h2>Dashboard</h2>
+<h2 class="text-xl font-semibold mb-5">Dashboard</h2>
 
 {# ── Stats ── #}
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="value">{{ stats.total_rows }}</div>
-    <div class="label">Lignes totales</div>
+<div class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3 mb-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+    <div class="text-3xl font-bold">{{ stats.total_rows }}</div>
+    <div class="text-xs text-slate-400 mt-1">Lignes totales</div>
   </div>
-  <div class="stat-card">
-    <div class="value">{{ stats.total_absolutes }}</div>
-    <div class="label">episode_absolute distincts</div>
+  <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+    <div class="text-3xl font-bold">{{ stats.total_absolutes }}</div>
+    <div class="text-xs text-slate-400 mt-1">episode_absolute distincts</div>
   </div>
   {% for source, count in stats.per_source.items() %}
-  <div class="stat-card">
-    <div class="value">{{ count }}</div>
-    <div class="label">Lignes {{ source }}</div>
+  <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+    <div class="text-3xl font-bold">{{ count }}</div>
+    <div class="text-xs text-slate-400 mt-1">Lignes {{ source }}</div>
   </div>
   {% endfor %}
 </div>
 
 {# ── Ingest ── #}
-<article>
-  <header><strong>Ingérer un anime</strong></header>
+<div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-6">
+  <p class="font-semibold text-sm text-slate-300 mb-3">Ingérer un anime</p>
   <form hx-post="/ingest"
         hx-target="#ingest-result"
         hx-swap="innerHTML"
         hx-indicator="#ingest-spinner">
-    <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
-      <div style="flex:1; min-width:200px;">
-        <label for="mal_id">MAL ID</label>
+    <div class="flex gap-3 items-end flex-wrap">
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-xs text-slate-400 mb-1" for="mal_id">MAL ID</label>
         <input id="mal_id" name="mal_id" type="number" min="1"
-               placeholder="ex : 52991 (Frieren)" required>
+               placeholder="ex : 52991 (Frieren)" required
+               class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-600">
       </div>
-      <div>
-        <button type="submit">
-          <span id="ingest-spinner" class="htmx-indicator" aria-busy="true"></span>
-          Ingérer
-        </button>
-      </div>
+      <button type="submit"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm transition-colors cursor-pointer">
+        <span id="ingest-spinner" class="htmx-indicator">⏳</span>
+        Ingérer
+      </button>
     </div>
   </form>
-  <div id="ingest-result"></div>
-</article>
+  <div id="ingest-result" class="mt-3"></div>
+</div>
 
 {# ── Anime ingérés ── #}
 <section

@@ -1,47 +1,23 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="dark">
+<html lang="fr" class="bg-slate-950">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Episode ID Map{% endblock %}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.slate.min.css">
+  <script type="module">
+    import 'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4'
+  </script>
   <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
   <style>
-    :root { --pico-font-size: 15px; }
-    nav { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--pico-muted-border-color); }
-    nav a { text-decoration: none; font-weight: 600; margin-right: 1.5rem; }
-    .container { max-width: 1400px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .stat-card { background: var(--pico-card-background-color); border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); padding: 1rem 1.25rem; }
-    .stat-card .value { font-size: 2rem; font-weight: 700; line-height: 1; }
-    .stat-card .label { font-size: 0.8rem; color: var(--pico-muted-color); margin-top: 0.25rem; }
-    /* Badge source_count */
-    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
-    .badge-5 { background: #166534; color: #bbf7d0; }
-    .badge-4 { background: #854d0e; color: #fef08a; }
-    .badge-3 { background: #854d0e; color: #fef08a; }
-    .badge-2 { background: #7f1d1d; color: #fecaca; }
-    .badge-1 { background: #374151; color: #9ca3af; }
-    /* Indicateur HTMX */
+    /* HTMX */
     .htmx-indicator { display: none; }
-    .htmx-request .htmx-indicator { display: inline; }
+    .htmx-request .htmx-indicator,
     .htmx-request.htmx-indicator { display: inline; }
-    /* Table */
-    table { font-size: 0.82rem; }
-    td, th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
-    td.mono { font-family: monospace; font-size: 0.75rem; color: var(--pico-muted-color); }
-    td.ep { text-align: center; }
-    td.ep.present { color: var(--pico-color); }
-    td.ep.absent { color: var(--pico-muted-color); }
-    /* Alert */
-    .alert { padding: 0.75rem 1rem; border-radius: var(--pico-border-radius); margin-top: 0.75rem; }
-    .alert-success { background: #14532d; border: 1px solid #166534; }
-    .alert-error   { background: #450a0a; border: 1px solid #7f1d1d; }
-    /* ── Tooltip ligne brute ── */
+    /* Tooltip — pseudo-element */
     .tip { position: relative; cursor: help; }
     .tip::after {
       content: attr(data-tip);
-      position: absolute; left: 50%; top: calc(100% + 4px);
+      position: absolute; left: 50%; top: calc(100% + 6px);
       transform: translateX(-50%);
       background: #0f172a; border: 1px solid #334155;
       border-radius: 6px; padding: 8px 12px;
@@ -49,31 +25,20 @@
       line-height: 1.55; color: #cbd5e1;
       z-index: 200; min-width: 310px;
       opacity: 0; pointer-events: none;
-      transition: opacity 0.12s ease;
-      box-shadow: 0 4px 16px rgba(0,0,0,.5);
+      transition: opacity 0.14s ease;
+      box-shadow: 0 4px 16px rgba(0,0,0,.6);
     }
     .tip:hover::after { opacity: 1; }
-    /* Évite la coupure en bord de tableau */
-    td:last-child .tip::after, td:nth-last-child(2) .tip::after {
-      left: auto; right: 0; transform: none;
-    }
-    /* ── Bouton supprimer ── */
-    .del-btn {
-      background: none; border: none; color: #ef4444;
-      cursor: pointer; font-size: 0.9rem; padding: 0 4px;
-      opacity: 0.5; transition: opacity 0.1s;
-      line-height: 1;
-    }
-    .del-btn:hover { opacity: 1; }
-    td.del-cell { text-align: center; width: 22px; padding: 2px 4px; }
+    td:last-child .tip::after,
+    td:nth-last-child(2) .tip::after { left: auto; right: 0; transform: none; }
   </style>
 </head>
-<body>
-  <nav>
-    <a href="/">📺 Episode ID Map</a>
-    <a href="/episodes">Comparaison</a>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <nav class="border-b border-slate-800 px-6 py-3 flex items-center gap-6">
+    <a href="/" class="font-semibold text-slate-100 no-underline hover:text-white">📺 Episode ID Map</a>
+    <a href="/episodes" class="text-slate-400 no-underline hover:text-slate-200 text-sm">Comparaison</a>
   </nav>
-  <main class="container" style="padding: 1.5rem;">
+  <main class="max-w-[1400px] mx-auto px-6 py-6">
     {% block content %}{% endblock %}
   </main>
 </body>
