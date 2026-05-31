@@ -57,12 +57,13 @@ def fake_db(monkeypatch):
 def test_ingest_writes_one_absolute_per_group(fake_db, settings) -> None:
     stats = ingest_mod.ingest(52991, settings=settings)
 
-    # 3 épisodes réels (5 vues) + 2 specials (1 vue) = 17 lignes, 5 groupes.
-    assert stats["groups"] == 5
-    assert stats["rows"] == 17
-    assert len(fake_db.cur.inserts) == 17
+    # 3 épisodes réels (5 sources) = 15 lignes écrites.
+    # Les 2 singletons TVDB/TMDB (specials hors grille MAL) sont ignorés (skipped=2).
+    assert stats["groups"] == 3
+    assert stats["skipped"] == 2
+    assert stats["rows"] == 15
+    assert len(fake_db.cur.inserts) == 15
     assert fake_db.committed
 
-    # params = (uuid, episode_absolute, source, id_series, id_season, id_episode, extra)
     absolutes = {row[1] for row in fake_db.cur.inserts}
-    assert len(absolutes) == 5  # un episode_absolute distinct par groupe
+    assert len(absolutes) == 3  # un episode_absolute distinct par groupe réel

@@ -100,10 +100,18 @@ def ingest(mal_id: int, *, settings: Settings) -> dict[str, int]:
     fetched = fetch_all(cluster, settings=settings)
     groups = align_episodes(cluster, fetched)
 
-    stats = {"groups": len(groups), "rows": 0}
+    stats = {"groups": 0, "skipped": 0, "rows": 0}
     with db.connect(settings) as conn:
         with conn.cursor() as cur:
             for group in groups:
+                # Ne mapper que les épisodes présents sur MAL : on part d'un mal_id,
+                # donc seul MAL définit le périmètre. Les épisodes sans contrepartie MAL
+                # (futurs épisodes pas encore sortis, arcs d'un autre MAL, specials…)
+                # seront écrits lors de l'ingest du MAL approprié.
+                if not any(v.source == "MAL" for v in group):
+                    stats["skipped"] += 1
+                    continue
+                stats["groups"] += 1
                 episode_absolute = assign_absolute(cur, group)
                 for view in group:
                     db.upsert_row(
