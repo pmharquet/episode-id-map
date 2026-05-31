@@ -1,0 +1,32 @@
+{% if not series_list %}
+<p><em>Aucun anime ingéré.</em></p>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>MAL id_series</th>
+      <th style="text-align:center">Groupes complets (5/5)</th>
+      <th style="text-align:center">Total episode_absolute</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in series_list %}
+    <tr>
+      <td><code>{{ s.mal_series }}</code></td>
+      <td style="text-align:center">
+        <span class="badge {% if s.full_groups == s.total_episodes %}badge-5{% elif s.full_groups > 0 %}badge-3{% else %}badge-1{% endif %}">
+          {{ s.full_groups }}/{{ s.total_episodes }}
+        </span>
+      </td>
+      <td style="text-align:center">{{ s.total_episodes }}</td>
+      <td>
+        <a href="/episodes?mal_series={{ s.mal_series }}" style="font-size:0.85rem;">
+          Comparer →
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Comparaison – Episode ID Map{% endblock %}
+
+{% block content %}
+<h2>Comparaison des épisodes</h2>
+
+{# ── Filtre série ── #}
+<div style="display:flex; gap:1rem; align-items:flex-end; margin-bottom:1rem; flex-wrap:wrap;">
+  <div style="flex:1; min-width:240px;">
+    <label for="mal_series">Anime (MAL id_series)</label>
+    <select id="mal_series" name="mal_series"
+            hx-get="/partials/episodes-table"
+            hx-target="#episodes-table"
+            hx-swap="innerHTML"
+            hx-include="[name='mal_series']"
+            hx-trigger="change">
+      <option value="">— Tous les anime —</option>
+      {% for s in series_list %}
+      <option value="{{ s.mal_series }}"
+        {% if s.mal_series == selected %}selected{% endif %}>
+        MAL {{ s.mal_series }}
+        ({{ s.full_groups }}/{{ s.total_episodes }} complets)
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if selected %}
+  <div>
+    <a href="/episodes" role="button" class="secondary outline">
+      Réinitialiser
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Table ── #}
+<div id="episodes-table">
+  {% include "partials/episodes_table.html" %}
+</div>
+
+{% endblock %}

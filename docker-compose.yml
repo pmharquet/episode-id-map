@@ -38,5 +38,21 @@ services:
     #   docker compose run --rm --no-deps app python -m episode_id_map.cli <source> ...
     command: ["python", "-m", "episode_id_map"]
 
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-episode_id_map}:${POSTGRES_PASSWORD:-episode_id_map}@db:5432/${POSTGRES_DB:-episode_id_map}
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - ./src:/app/src
+      - ./cache:/app/cache
+    command: ["uvicorn", "episode_id_map.web.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
 volumes:
   pgdata:

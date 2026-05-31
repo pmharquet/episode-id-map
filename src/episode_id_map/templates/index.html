@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Episode ID Map{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+{# ── Stats ── #}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="value">{{ stats.total_rows }}</div>
+    <div class="label">Lignes totales</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ stats.total_absolutes }}</div>
+    <div class="label">episode_absolute distincts</div>
+  </div>
+  {% for source, count in stats.per_source.items() %}
+  <div class="stat-card">
+    <div class="value">{{ count }}</div>
+    <div class="label">Lignes {{ source }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Ingest ── #}
+<article>
+  <header><strong>Ingérer un anime</strong></header>
+  <form hx-post="/ingest"
+        hx-target="#ingest-result"
+        hx-swap="innerHTML"
+        hx-indicator="#ingest-spinner">
+    <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <label for="mal_id">MAL ID</label>
+        <input id="mal_id" name="mal_id" type="number" min="1"
+               placeholder="ex : 52991 (Frieren)" required>
+      </div>
+      <div>
+        <button type="submit">
+          <span id="ingest-spinner" class="htmx-indicator" aria-busy="true"></span>
+          Ingérer
+        </button>
+      </div>
+    </div>
+  </form>
+  <div id="ingest-result"></div>
+</article>
+
+{# ── Anime ingérés ── #}
+<section
+  id="series-list"
+  hx-get="/partials/series-list"
+  hx-trigger="load, ingestDone from:body"
+  hx-swap="innerHTML">
+  {% include "partials/series_list.html" %}
+</section>
+
+{% endblock %}

@@ -1,0 +1,50 @@
+{% if not groups %}
+<p><em>Aucune donnée — sélectionnez un anime ou lancez un ingest.</em></p>
+{% else %}
+<div style="overflow-x:auto;">
+<table>
+  <thead>
+    <tr>
+      <th>Sources</th>
+      <th>episode_absolute</th>
+      <th style="text-align:center">AniDB</th>
+      <th style="text-align:center">MAL</th>
+      <th style="text-align:center">SIMKL</th>
+      <th style="text-align:center">TVDB</th>
+      <th style="text-align:center">TMDB</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for g in groups %}
+    {% set n = g.source_count %}
+    <tr>
+      <td>
+        <span class="badge badge-{{ n }}">{{ n }}/5</span>
+      </td>
+      <td class="mono" title="{{ g.episode_absolute }}">
+        {{ g.episode_absolute[:8] }}…
+      </td>
+      <td class="ep {% if g.anidb_ep %}present{% else %}absent{% endif %}">
+        {% if g.anidb_ep %}Ep {{ g.anidb_ep }}{% else %}—{% endif %}
+      </td>
+      <td class="ep {% if g.mal_ep %}present{% else %}absent{% endif %}">
+        {% if g.mal_ep %}Ep {{ g.mal_ep }}{% else %}—{% endif %}
+      </td>
+      <td class="ep {% if g.simkl_ep %}present{% else %}absent{% endif %}">
+        {% if g.simkl_ep %}{{ g.simkl_ep }}{% else %}—{% endif %}
+      </td>
+      <td class="ep {% if g.tvdb_ep %}present{% else %}absent{% endif %}">
+        {% if g.tvdb_ep %}{{ g.tvdb_ep }}{% else %}—{% endif %}
+      </td>
+      <td class="ep {% if g.tmdb_ep %}present{% else %}absent{% endif %}">
+        {% if g.tmdb_ep %}{{ g.tmdb_ep }}{% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p style="font-size:0.8rem; color:var(--pico-muted-color); margin-top:0.5rem;">
+  {{ groups|length }} groupe(s) affiché(s)
+</p>
+{% endif %}

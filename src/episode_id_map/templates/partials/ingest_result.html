@@ -1,0 +1,16 @@
+{% if success %}
+<div class="alert alert-success">
+  <strong>✅ Ingestion réussie</strong> — MAL {{ mal_id }}<br>
+  {{ stats.groups }} groupes · {{ stats.rows }} lignes écrites
+  <br>
+  <a href="/episodes?mal_series={{ mal_id }}" style="font-size:0.85rem;">
+    → Voir la comparaison
+  </a>
+</div>
+<script>document.body.dispatchEvent(new Event("ingestDone"));</script>
+{% else %}
+<div class="alert alert-error">
+  <strong>❌ Erreur</strong> — MAL {{ mal_id }}<br>
+  <code>{{ error }}</code>
+</div>
+{% endif %}
