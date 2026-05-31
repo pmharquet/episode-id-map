@@ -144,6 +144,13 @@ def align_episodes(cluster: Cluster, f: Fetched) -> list[list[EpisodeView]]:
             tvdbid_to_se[str(ep["id"])] = se
         ad = to_date(ep.get("aired"))
         epno = se_to_epno.get(se) if se is not None else None
+        # Ordering absolu : `number` = numéro séquentiel global = epno AniDB.
+        # Ce fallback est prioritaire sur l'airdate car TVDB et AniDB peuvent
+        # avoir des dates décalées de plusieurs jours/semaines pour le même épisode
+        # (ex. : one-piece ep 101 : AniDB=2002-02-17, TVDB=2002-03-17).
+        if epno is None and tvdb_season_type == "absolute" and num is not None and num in grid:
+            epno = num
+        # Fallback airdate pour l'ordering officiel (ou si number hors grille).
         if epno is None and ad and len(airdate_to_epnos.get(ad, [])) == 1:
             epno = airdate_to_epnos[ad][0]
         tvdb_views.append(
@@ -163,6 +170,10 @@ def align_episodes(cluster: Cluster, f: Fetched) -> list[list[EpisodeView]]:
             se = tvdbid_to_se.get(str(tvid))
             if se is not None:
                 epno = se_to_epno.get(se)
+                # Ordering absolu : si se_to_epno échoue, le numéro d'épisode
+                # dans le couple (saison, numéro) de TVDB est le numéro global.
+                if epno is None and tvdb_season_type == "absolute" and se[1] in grid:
+                    epno = se[1]
         if epno is None and ad and len(airdate_to_epnos.get(ad, [])) == 1:
             epno = airdate_to_epnos[ad][0]
         tmdb_views.append(
