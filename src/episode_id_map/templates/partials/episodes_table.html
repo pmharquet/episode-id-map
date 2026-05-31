@@ -16,30 +16,7 @@
   </thead>
   <tbody>
     {% for g in groups %}
-    {% set n = g.source_count %}
-    <tr>
-      <td>
-        <span class="badge badge-{{ n }}">{{ n }}/5</span>
-      </td>
-      <td class="mono" title="{{ g.episode_absolute }}">
-        {{ g.episode_absolute[:8] }}…
-      </td>
-      <td class="ep {% if g.anidb_ep %}present{% else %}absent{% endif %}">
-        {% if g.anidb_ep %}Ep {{ g.anidb_ep }}{% else %}—{% endif %}
-      </td>
-      <td class="ep {% if g.mal_ep %}present{% else %}absent{% endif %}">
-        {% if g.mal_ep %}Ep {{ g.mal_ep }}{% else %}—{% endif %}
-      </td>
-      <td class="ep {% if g.simkl_ep %}present{% else %}absent{% endif %}">
-        {% if g.simkl_ep %}{{ g.simkl_ep }}{% else %}—{% endif %}
-      </td>
-      <td class="ep {% if g.tvdb_ep %}present{% else %}absent{% endif %}">
-        {% if g.tvdb_ep %}{{ g.tvdb_ep }}{% else %}—{% endif %}
-      </td>
-      <td class="ep {% if g.tmdb_ep %}present{% else %}absent{% endif %}">
-        {% if g.tmdb_ep %}{{ g.tmdb_ep }}{% else %}—{% endif %}
-      </td>
-    </tr>
+    {% include "partials/row.html" %}
     {% endfor %}
   </tbody>
 </table>

@@ -83,6 +83,26 @@ def series_list_partial(request: Request) -> HTMLResponse:
     return _r(request, "partials/series_list.html", {"series_list": series_list})
 
 
+@app.post("/rows/delete", response_class=HTMLResponse)
+def delete_row(
+    request: Request,
+    uuid: str = Form(...),
+    episode_absolute: str = Form(...),
+) -> HTMLResponse:
+    s = _get_settings()
+    with connect(s) as conn:
+        queries.delete_row(conn, uuid)
+        group = queries.get_group(conn, episode_absolute)
+    if group is None:
+        # Toutes les lignes du groupe supprimées → ligne vide
+        return HTMLResponse(
+            f'<tr id="r-{episode_absolute[:8]}">'
+            '<td colspan="8" style="color:var(--pico-muted-color);font-style:italic">'
+            "Groupe supprimé</td></tr>"
+        )
+    return _r(request, "partials/row.html", {"g": group})
+
+
 @app.post("/ingest", response_class=HTMLResponse)
 def do_ingest(request: Request, mal_id: int = Form(...)) -> HTMLResponse:
     s = _get_settings()

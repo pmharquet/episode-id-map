@@ -1,0 +1,45 @@
+{# Ligne <tr> d'un groupe d'épisodes. Utilisée par episodes_table.html ET par /rows/delete. #}
+{# Attend la variable `g` (EpisodeGroup). #}
+{% set ea8 = g.episode_absolute[:8] %}
+
+{# ── Macro : cellule source avec tooltip + bouton supprimer ── #}
+{% macro src_cell(source, label) %}
+{% set row = g.rows.get(source) %}
+{% if row %}
+{% set tip %}uuid:      {{ row.uuid }}
+source:    {{ row.source }}
+id_fran:   {{ row.id_franchise or 'null' }}
+id_series: {{ row.id_series or 'null' }}
+id_season: {{ row.id_season or 'null' }}
+id_ep:     {{ row.id_episode or 'null' }}
+extra:     {{ row.extra or 'null' }}
+ea:        {{ row.episode_absolute }}{% endset %}
+<td class="ep present">
+  <span class="tip" data-tip="{{ tip }}">{{ label }}</span>
+  <form style="display:inline" method="post" action="/rows/delete">
+    <input type="hidden" name="uuid" value="{{ row.uuid }}">
+    <input type="hidden" name="episode_absolute" value="{{ g.episode_absolute }}">
+    <button class="del-btn" type="submit"
+            hx-post="/rows/delete"
+            hx-include="closest form"
+            hx-target="#r-{{ ea8 }}"
+            hx-swap="outerHTML"
+            title="Supprimer cette ligne">×</button>
+  </form>
+</td>
+{% else %}
+<td class="ep absent">—</td>
+{% endif %}
+{% endmacro %}
+
+<tr id="r-{{ ea8 }}">
+  <td>
+    <span class="badge badge-{{ g.source_count }}">{{ g.source_count }}/5</span>
+  </td>
+  <td class="mono" title="{{ g.episode_absolute }}">{{ ea8 }}…</td>
+  {{ src_cell("ANIDB", "Ep " ~ g.anidb_ep if g.anidb_ep else "—") }}
+  {{ src_cell("MAL",   "Ep " ~ g.mal_ep   if g.mal_ep   else "—") }}
+  {{ src_cell("SIMKL", g.simkl_ep          if g.simkl_ep else "—") }}
+  {{ src_cell("TVDB",  g.tvdb_ep            if g.tvdb_ep  else "—") }}
+  {{ src_cell("TMDB",  g.tmdb_ep            if g.tmdb_ep  else "—") }}
+</tr>
