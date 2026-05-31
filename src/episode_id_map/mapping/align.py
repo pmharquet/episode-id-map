@@ -190,7 +190,23 @@ def align_episodes(cluster: Cluster, f: Fetched) -> list[list[EpisodeView]]:
             groups.setdefault(view.epno, []).append(view)
         else:
             singles.append(view)
-    return [groups[k] for k in sorted(groups)] + [[v] for v in singles]
+
+    # 7. Rattachement par numéro pour les singletons MAL (et SIMKL) :
+    #    AniDB utilise les dates de diffusion japonaises, MAL/SIMKL parfois les dates
+    #    internationales avec des écarts de plusieurs semaines (ex. : One Piece ep 156 :
+    #    AniDB=2003-05-25, MAL=2003-06-08, diff=14 j → hors tolérance ±1 j).
+    #    Si le numéro MAL/SIMKL correspond à un groupe AniDB existant, on l'y rattache
+    #    car la numérotation est une preuve forte de correspondance.
+    remaining_singles: list[EpisodeView] = []
+    for view in singles:
+        if view.source in ("MAL", "SIMKL") and view.id_episode:
+            n = _int(view.id_episode)
+            if n is not None and n in groups:
+                groups[n].append(view)
+                continue
+        remaining_singles.append(view)
+
+    return [groups[k] for k in sorted(groups)] + [[v] for v in remaining_singles]
 
 
 def _s(value: object) -> str | None:
