@@ -177,3 +177,17 @@ def delete_group(conn, episode_absolute: str) -> None:
             (episode_absolute,),
         )
     conn.commit()
+
+
+def get_mapped_mal_ids(conn) -> set[int]:
+    """Retourne les MAL id_series déjà présents en base."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT DISTINCT id_series FROM episode_id_map WHERE source = 'MAL'")
+        rows = cur.fetchall()
+    result: set[int] = set()
+    for (val,) in rows:
+        try:
+            result.add(int(val))
+        except (ValueError, TypeError):
+            pass
+    return result

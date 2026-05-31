@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import threading
+import uuid as uuidlib
+from dataclasses import dataclass, field
 from pathlib import Path
+from queue import Empty, Queue
 
 import structlog
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -39,6 +45,47 @@ def _get_settings() -> Settings:
 def _r(request: Request, name: str, ctx: dict) -> HTMLResponse:
     """Wrapper pour la nouvelle signature TemplateResponse de Starlette 1.x."""
     return templates.TemplateResponse(request=request, name=name, context=ctx)
+
+
+# ── Batch import ────────────────────────────────────────────────────────────────
+
+@dataclass
+class _BatchJob:
+    job_id: str
+    mal_ids: list[int]
+    total: int
+    queue: Queue = field(default_factory=Queue)
+
+
+_jobs: dict[str, _BatchJob] = {}
+
+
+def _run_batch(job: _BatchJob, settings: Settings) -> None:
+    """Exécuté dans un thread daemon ; pousse des événements dans job.queue."""
+    for idx, mal_id in enumerate(job.mal_ids, start=1):
+        try:
+            stats = run_ingest(mal_id, settings=settings)
+            job.queue.put({
+                "type": "progress",
+                "mal_id": mal_id,
+                "status": "ok",
+                "processed": idx,
+                "total": job.total,
+                "percent": round(idx / job.total * 100, 1),
+                "groups": stats.get("groups", 0),
+                "rows": stats.get("rows", 0),
+            })
+        except Exception as exc:  # noqa: BLE001
+            job.queue.put({
+                "type": "progress",
+                "mal_id": mal_id,
+                "status": "error",
+                "processed": idx,
+                "total": job.total,
+                "percent": round(idx / job.total * 100, 1),
+                "error": str(exc),
+            })
+    job.queue.put({"type": "done", "total": job.total})
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────────
@@ -127,3 +174,74 @@ def do_ingest(request: Request, mal_id: int = Form(...)) -> HTMLResponse:
             context={"success": False, "error": str(exc), "mal_id": mal_id},
             status_code=422,
         )
+
+
+# ── Import JSON (batch) ─────────────────────────────────────────────────────────
+
+@app.post("/ingest/json")
+async def ingest_json(file: UploadFile = File(...)) -> JSONResponse:
+    content = await file.read()
+    try:
+        data = json.loads(content)
+        mal_ids_raw = data.get("mal_ids")
+        if not isinstance(mal_ids_raw, list):
+            raise ValueError('"mal_ids" doit être une liste')
+        mal_ids = [int(x) for x in mal_ids_raw]
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+    s = _get_settings()
+    with connect(s) as conn:
+        already = queries.get_mapped_mal_ids(conn)
+
+    to_process = [x for x in mal_ids if x not in already]
+    already_mapped = len(mal_ids) - len(to_process)
+
+    if not to_process:
+        return JSONResponse({
+            "job_id": None,
+            "total": len(mal_ids),
+            "to_process": 0,
+            "already_mapped": already_mapped,
+        })
+
+    job_id = str(uuidlib.uuid4())
+    job = _BatchJob(job_id=job_id, mal_ids=to_process, total=len(to_process))
+    _jobs[job_id] = job
+
+    threading.Thread(target=_run_batch, args=(job, s), daemon=True).start()
+    log.info("batch.started", job_id=job_id, to_process=len(to_process), skipped=already_mapped)
+
+    return JSONResponse({
+        "job_id": job_id,
+        "total": len(mal_ids),
+        "to_process": len(to_process),
+        "already_mapped": already_mapped,
+    })
+
+
+@app.get("/ingest/batch/{job_id}/stream")
+async def stream_batch(job_id: str) -> StreamingResponse:
+    job = _jobs.get(job_id)
+    if job is None:
+        return JSONResponse({"error": "Job introuvable"}, status_code=404)
+
+    async def event_gen():
+        try:
+            while True:
+                try:
+                    event = job.queue.get_nowait()
+                    yield f"data: {json.dumps(event)}\n\n"
+                    if event.get("type") == "done":
+                        _jobs.pop(job_id, None)
+                        return
+                except Empty:
+                    await asyncio.sleep(0.3)
+        except asyncio.CancelledError:
+            return
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

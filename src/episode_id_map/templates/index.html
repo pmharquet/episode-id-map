@@ -23,7 +23,7 @@
 </div>
 
 {# ── Ingest ── #}
-<div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-6">
+<div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-4">
   <p class="font-semibold text-sm text-slate-300 mb-3">Ingérer un anime</p>
   <form hx-post="/ingest"
         hx-target="#ingest-result"
@@ -45,6 +45,166 @@
   </form>
   <div id="ingest-result" class="mt-3"></div>
 </div>
+
+{# ── Import JSON ── #}
+<div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-6">
+  <p class="font-semibold text-sm text-slate-300 mb-3">Importer depuis un fichier JSON</p>
+  <p class="text-xs text-slate-500 mb-3">Format attendu : <code class="text-slate-400">{"mal_ids":[1,2,3,...]}</code> — les IDs déjà mappés sont ignorés automatiquement.</p>
+  <div class="flex gap-3 items-end flex-wrap">
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs text-slate-400 mb-1" for="json-file">Fichier JSON</label>
+      <input id="json-file" type="file" accept=".json,application/json"
+             class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-slate-700 file:text-slate-200 file:cursor-pointer cursor-pointer">
+    </div>
+    <button onclick="startJsonImport()"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded text-sm transition-colors cursor-pointer">
+      Importer
+    </button>
+  </div>
+
+  <div id="json-progress" class="mt-4 hidden">
+    <div class="flex justify-between text-xs text-slate-400 mb-1">
+      <span id="json-status-text">Préparation…</span>
+      <span id="json-percent">0%</span>
+    </div>
+    <div class="w-full bg-slate-800 rounded-full h-2 mb-2">
+      <div id="json-progress-bar" class="bg-indigo-500 h-2 rounded-full transition-all duration-300" style="width:0%"></div>
+    </div>
+    <div id="json-timing" class="hidden flex justify-between text-xs text-slate-500 mb-2">
+      <span id="json-elapsed"></span>
+      <span id="json-eta"></span>
+    </div>
+    <div id="json-log" class="max-h-52 overflow-y-auto space-y-0.5 text-xs font-mono bg-slate-950 rounded p-2 border border-slate-800"></div>
+  </div>
+</div>
+
+<script>
+async function startJsonImport() {
+  const fileInput = document.getElementById('json-file');
+  const file = fileInput.files[0];
+  if (!file) { alert('Sélectionnez un fichier JSON.'); return; }
+
+  const progressEl = document.getElementById('json-progress');
+  const barEl      = document.getElementById('json-progress-bar');
+  const pctEl      = document.getElementById('json-percent');
+  const statusEl   = document.getElementById('json-status-text');
+  const logEl      = document.getElementById('json-log');
+
+  progressEl.classList.remove('hidden');
+  barEl.style.width = '0%';
+  pctEl.textContent = '0%';
+  logEl.innerHTML = '';
+  statusEl.textContent = 'Envoi du fichier…';
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  let resp, data;
+  try {
+    resp = await fetch('/ingest/json', { method: 'POST', body: fd });
+    data = await resp.json();
+  } catch (e) {
+    statusEl.textContent = 'Erreur réseau : ' + e.message;
+    return;
+  }
+
+  if (!resp.ok) {
+    statusEl.textContent = 'Erreur : ' + (data.error || resp.statusText);
+    return;
+  }
+
+  const { job_id, total, to_process, already_mapped } = data;
+
+  if (already_mapped > 0) {
+    appendLog(logEl, 'slate', `↷ ${already_mapped} ID${already_mapped > 1 ? 's' : ''} déjà mappé${already_mapped > 1 ? 's' : ''} — ignoré${already_mapped > 1 ? 's' : ''}`);
+  }
+
+  if (!job_id || to_process === 0) {
+    statusEl.textContent = 'Rien à traiter — tout est déjà mappé.';
+    barEl.style.width = '100%';
+    pctEl.textContent = '100%';
+    return;
+  }
+
+  statusEl.textContent = `Traitement de ${to_process} ID${to_process > 1 ? 's' : ''} sur ${total}…`;
+
+  const timingEl  = document.getElementById('json-timing');
+  const elapsedEl = document.getElementById('json-elapsed');
+  const etaEl     = document.getElementById('json-eta');
+
+  const startTime = Date.now();
+  timingEl.classList.remove('hidden');
+  elapsedEl.textContent = 'écoulé 0s';
+  etaEl.textContent = '';
+
+  const ticker = setInterval(() => {
+    elapsedEl.textContent = 'écoulé ' + fmtDuration((Date.now() - startTime) / 1000);
+  }, 1000);
+
+  const es = new EventSource(`/ingest/batch/${job_id}/stream`);
+
+  es.onmessage = (e) => {
+    const evt = JSON.parse(e.data);
+
+    if (evt.type === 'progress') {
+      const pct = evt.percent.toFixed(1) + '%';
+      barEl.style.width = pct;
+      pctEl.textContent = pct;
+      statusEl.textContent = `${evt.processed} / ${evt.total} traités`;
+
+      const elapsed = (Date.now() - startTime) / 1000;
+      elapsedEl.textContent = 'écoulé ' + fmtDuration(elapsed);
+      if (evt.processed < evt.total) {
+        const remaining = elapsed / evt.processed * (evt.total - evt.processed);
+        etaEl.textContent = 'reste ~' + fmtDuration(remaining);
+      } else {
+        etaEl.textContent = '';
+      }
+
+      if (evt.status === 'ok') {
+        appendLog(logEl, 'green', `✓ MAL ${evt.mal_id} — ${evt.groups} groupes, ${evt.rows} lignes`);
+      } else {
+        appendLog(logEl, 'red', `✗ MAL ${evt.mal_id} — ${evt.error}`);
+      }
+    }
+
+    if (evt.type === 'done') {
+      clearInterval(ticker);
+      es.close();
+      barEl.style.width = '100%';
+      pctEl.textContent = '100%';
+      statusEl.textContent = `Terminé — ${evt.total} ID${evt.total > 1 ? 's' : ''} traité${evt.total > 1 ? 's' : ''}`;
+      elapsedEl.textContent = 'durée totale ' + fmtDuration((Date.now() - startTime) / 1000);
+      etaEl.textContent = '';
+      document.body.dispatchEvent(new Event('ingestDone'));
+    }
+  };
+
+  es.onerror = () => {
+    clearInterval(ticker);
+    es.close();
+    statusEl.textContent = 'Connexion interrompue.';
+    etaEl.textContent = '';
+  };
+}
+
+function fmtDuration(secs) {
+  const s = Math.round(secs);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? m + 'm' : m + 'm ' + r + 's';
+}
+
+function appendLog(container, color, text) {
+  const colorMap = { green: 'text-green-400', red: 'text-red-400', slate: 'text-slate-400' };
+  const el = document.createElement('div');
+  el.className = colorMap[color] || 'text-slate-300';
+  el.textContent = text;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+</script>
 
 {# ── Anime ingérés ── #}
 <section
