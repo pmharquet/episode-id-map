@@ -21,8 +21,8 @@ class TMDBClient(BaseClient):
             raise RuntimeError("TMDB_API_KEY manquant dans .env")
         super().__init__(
             settings.tmdb_base_url,
-            rate=15.0,
-            burst=20,
+            rate=4.0,   # TMDB limite à ~40 req/10s ; 4/s conservateur
+            burst=8,
             params={"api_key": settings.tmdb_api_key, "language": language},
         )
 

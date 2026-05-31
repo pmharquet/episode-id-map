@@ -12,7 +12,7 @@ import structlog
 
 from . import db
 from .config import Settings
-from .mapping.align import align_episodes
+from .mapping.align import align_episodes, detect_tvdb_season_type
 from .mapping.anchor import assign_absolute
 from .mapping.cluster import resolve_cluster
 from .models import Cluster, Fetched, Row
@@ -41,21 +41,38 @@ def fetch_all(cluster: Cluster, *, settings: Settings) -> Fetched:
             f.simkl = simkl.get_episodes(cluster.simkl_id)
 
     if cluster.tvdb_id:
+        # L'ordering TVDB utilisé par SIMKL peut être "official" (S1,S2…) ou "absolute"
+        # (tous les épisodes en S0Exx). On détecte depuis le mapping SIMKL pour que les
+        # coordonnées (saison, épisode) soient cohérentes entre les deux sources.
+        tvdb_type = detect_tvdb_season_type(f.simkl)
+        f.tvdb_season_type = tvdb_type
+        log.info("tvdb.season_type", season_type=tvdb_type)
         with TVDBClient(settings) as tvdb:
-            f.tvdb = list(tvdb.iter_episodes(cluster.tvdb_id))
+            f.tvdb = list(tvdb.iter_episodes(cluster.tvdb_id, season_type=tvdb_type))
 
     if cluster.tmdb_id:
         with TMDBClient(settings) as tmdb:
             episodes = list(tmdb.iter_episodes(cluster.tmdb_id))
-            for ep in episodes:
-                # Pont fort TMDB→TVDB : id épisode TVDB via external_ids (1 appel/ép.).
-                try:
-                    ext = tmdb.get_episode_external_ids(
-                        cluster.tmdb_id, ep["season_number"], ep["episode_number"]
-                    )
-                    ep["tvdb_id"] = ext.get("tvdb_id")
-                except Exception:  # noqa: BLE001 — épisode sans external_ids → fallback airdate
-                    ep["tvdb_id"] = None
+            # Le pont TMDB→TVDB (external_ids) fait 1 appel API par épisode.
+            # Pour les grandes séries, le coût est prohibitif et le rate-limit TMDB
+            # (~4 req/s) rend l'opération peu fiable. On utilise uniquement l'airdate
+            # comme fallback pour les séries > TMDB_EXT_IDS_LIMIT épisodes.
+            _TMDB_EXT_IDS_LIMIT = 200
+            if len(episodes) <= _TMDB_EXT_IDS_LIMIT:
+                for ep in episodes:
+                    try:
+                        ext = tmdb.get_episode_external_ids(
+                            cluster.tmdb_id, ep["season_number"], ep["episode_number"]
+                        )
+                        ep["tvdb_id"] = ext.get("tvdb_id")
+                    except Exception:  # noqa: BLE001
+                        ep["tvdb_id"] = None
+            else:
+                log.info(
+                    "tmdb.ext_ids.skipped",
+                    episodes=len(episodes),
+                    reason=f">{_TMDB_EXT_IDS_LIMIT} épisodes → fallback airdate",
+                )
             f.tmdb = episodes
 
     log.info(

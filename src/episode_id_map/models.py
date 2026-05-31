@@ -34,6 +34,7 @@ class Fetched:
     simkl: list[dict] = field(default_factory=list)
     tvdb: list[dict] = field(default_factory=list)
     tmdb: list[dict] = field(default_factory=list)
+    tvdb_season_type: str = "official"  # "official" | "absolute" — déterminé depuis SIMKL
 
 
 @dataclass

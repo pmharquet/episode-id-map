@@ -30,6 +30,24 @@ def aid_from_external(external: list[dict]) -> int | None:
     return None
 
 
+def detect_tvdb_season_type(simkl_episodes: list[dict]) -> str:
+    """Renvoie 'absolute' si la majorité des épisodes réguliers SIMKL pointent vers
+    la saison 0 de TVDB (ordering absolu), sinon 'official'.
+
+    Certains anime (One Piece, Naruto, ...) utilisent l'ordering absolu TVDB où tous
+    les épisodes sont en S0Exx ; d'autres (Frieren, ...) utilisent l'ordering officiel
+    (S1, S2, ...). SIMKL indique lequel via le champ tvdb.season de chaque épisode.
+    """
+    regular = [
+        e for e in simkl_episodes
+        if e.get("type", "episode") == "episode" and e.get("tvdb")
+    ]
+    if not regular:
+        return "official"
+    season_0 = sum(1 for e in regular if e["tvdb"].get("season") == 0)
+    return "absolute" if season_0 / len(regular) > 0.5 else "official"
+
+
 def to_date(value: object) -> date | None:
     if not value:
         return None
@@ -113,9 +131,12 @@ def align_episodes(cluster: Cluster, f: Fetched) -> list[list[EpisodeView]]:
                         None, epno=epno, airdate=ad)
         )
 
-    # 4. TVDB : (saison, numéro) -> epno via le mapping SIMKL
+    # 4. TVDB : (saison, numéro) -> epno via le mapping SIMKL, fallback airdate unique.
+    # Pour les grandes séries (One Piece…), SIMKL ne couvre que les premiers arcs ;
+    # le fallback airdate prend le relais pour les autres épisodes.
     tvdbid_to_se: dict[str, tuple[int, int]] = {}
     tvdb_views: list[EpisodeView] = []
+    tvdb_season_type = f.tvdb_season_type
     for ep in f.tvdb:
         s, num = _int(ep.get("seasonNumber")), _int(ep.get("number"))
         se = (s, num) if s is not None and num is not None else None
@@ -123,10 +144,12 @@ def align_episodes(cluster: Cluster, f: Fetched) -> list[list[EpisodeView]]:
             tvdbid_to_se[str(ep["id"])] = se
         ad = to_date(ep.get("aired"))
         epno = se_to_epno.get(se) if se is not None else None
+        if epno is None and ad and len(airdate_to_epnos.get(ad, [])) == 1:
+            epno = airdate_to_epnos[ad][0]
         tvdb_views.append(
             EpisodeView("TVDB", _s(cluster.tvdb_id),
                         _s(s), _s(num),
-                        {"season_type": "official"}, epno=epno, airdate=ad)
+                        {"season_type": tvdb_season_type}, epno=epno, airdate=ad)
         )
 
     # 5. TMDB : tvdb_id (episode external_ids) -> TVDB (s,e) -> epno ; sinon airdate unique
