@@ -1,8 +1,6 @@
-{# Ligne <tr> d'un groupe d'épisodes. Utilisée par episodes_table.html ET par /rows/delete. #}
-{# Attend la variable `g` (EpisodeGroup). #}
+{# Ligne <tr> d'un groupe d'épisodes. Attend la variable `g` (EpisodeGroup). #}
 {% set ea8 = g.episode_absolute[:8] %}
 
-{# ── Macro : cellule source avec tooltip + bouton supprimer ── #}
 {% macro src_cell(source, label) %}
 {% set row = g.rows.get(source) %}
 {% if row %}
@@ -16,16 +14,12 @@ extra:     {{ row.extra or 'null' }}
 ea:        {{ row.episode_absolute }}{% endset %}
 <td class="ep present">
   <span class="tip" data-tip="{{ tip }}">{{ label }}</span>
-  <form style="display:inline" method="post" action="/rows/delete">
-    <input type="hidden" name="uuid" value="{{ row.uuid }}">
-    <input type="hidden" name="episode_absolute" value="{{ g.episode_absolute }}">
-    <button class="del-btn" type="submit"
-            hx-post="/rows/delete"
-            hx-include="closest form"
-            hx-target="#r-{{ ea8 }}"
-            hx-swap="outerHTML"
-            title="Supprimer cette ligne">×</button>
-  </form>
+  <button class="del-btn"
+          hx-post="/rows/delete"
+          hx-vals='{"uuid":"{{ row.uuid }}","episode_absolute":"{{ g.episode_absolute }}"}'
+          hx-target="#r-{{ ea8 }}"
+          hx-swap="outerHTML"
+          title="Supprimer cette ligne">X</button>
 </td>
 {% else %}
 <td class="ep absent">—</td>
