@@ -1,43 +1,87 @@
-# episode_id_map
+# episode-id-map
 
-Service de mapping des identifiants d'épisodes d'anime entre **5 sources**
-(MAL · SIMKL · TMDB · TVDB · AniDB), ancrés sur un unique `episode_absolute`
-(UUIDv4 persisté). Finalité : alimenter un bot Discord (n8n + LLM sur Supabase)
-qui annonce les sorties traduites, sans doublon.
+Mapping of anime episode identifiers across **5 databases** into a single stable UUID (`episode_absolute`) shared by all source representations of the same episode.
 
-- **Documentation des API** : [`docs/apis/`](./docs/apis/) (livrable ÉTAPE 1).
-- **Schéma de la table** : [`db/init/001_schema.sql`](./db/init/001_schema.sql) (figé).
+---
 
-## Socle (ÉTAPE 2)
+## Sources
 
-Stack : Python 3.11+ (`httpx`, `tenacity`, `typer`, `structlog`, `psycopg`) +
-PostgreSQL 15 (cible Supabase), le tout en Docker. Le code d'ingestion arrive à
-l'ÉTAPE 3 — le projet Python est pour l'instant **vide** (seul un smoke test
-vérifie connexion + présence de la table).
+| Source | ID used | Auth | Rate applied |
+|---|---|---|---|
+| **MAL** (via Jikan) | `mal_id` | none | 1 req/s |
+| **AniDB** | `aid` | `client` + `clientver` | 0.5 req/s · mandatory disk cache |
+| **SIMKL** | `simkl_id` | `simkl-api-key` header | 4 req/s |
+| **TVDB** | `tvdb_id` | `POST /login` → Bearer JWT | 8 req/s |
+| **TMDB** | `tmdb_id` | `api_key` query param | 4 req/s |
 
-### Démarrer
+---
+
+## How it works
+
+Ingestion starts from a **MAL ID**:
+
+1. **Resolve cluster** — chains MAL → AniDB (via Jikan) → SIMKL → TMDB/TVDB IDs.
+2. **Fetch all 5 sources** and align episodes against AniDB's episode grid as the canonical reference.
+3. **Assign `episode_absolute`** — a stable UUIDv4 shared across all source rows for the same real episode. Pre-existing rows anchor the UUID; conflicts are logged, never silently merged.
+4. **Upsert idempotently** — re-running the same ingest is safe; UUIDs never change.
+
+Only episodes present on MAL are written. TVDB/TMDB episodes with no MAL counterpart are skipped.
+
+---
+
+## Stack
+
+```
+Python 3.11+   httpx · tenacity · typer · structlog · psycopg[binary]
+PostgreSQL 15
+Docker         postgres:15-alpine + python:3.11-slim
+FastAPI + HTMX (web UI)
+```
+
+---
+
+## Getting started
 
 ```bash
-cp .env.example .env   # puis remplir les clés API (les valeurs DB ont des défauts)
+cp .env.example .env      # fill in API keys — DB defaults work out of the box
 docker compose up --build
 ```
 
-Au 1er lancement, Postgres exécute `db/init/001_schema.sql` puis le conteneur
-`app` affiche `✅ connexion OK — table episode_id_map présente (0 lignes)`.
+On first boot Postgres runs `db/init/001_schema.sql` automatically. The web UI starts on **http://localhost:8000**.
 
-> ⚠ Le port `5432` est souvent déjà occupé sous Windows. En cas de conflit,
-> définir `POSTGRES_PORT=5433` dans `.env`.
+> **Windows** — port `5432` is often taken. Set `POSTGRES_PORT=5433` in `.env` if needed.
 
-### Se connecter à la base
+### Connect to the database
 
 ```bash
-docker compose exec db psql -U episode_id_map -d episode_id_map
+docker compose exec db psql -U $POSTGRES_USER -d $POSTGRES_DB
 ```
 
-## Fetchers par source (ÉTAPE 3)
+---
 
-Un client par API dans `src/episode_id_map/sources/` (auth, pagination et rate-limit
-propres à chaque source ; retry/backoff mutualisé sur `429`/`5xx`). Une CLI de test :
+## Ingest
+
+```bash
+docker compose run --rm app python -m episode_id_map.cli ingest 52991
+# {"groups": 28, "skipped": 73, "rows": 140}
+```
+
+`groups` = episode groups written, `skipped` = episodes with no MAL counterpart, `rows` = total DB rows written.
+
+---
+
+## Web UI
+
+```bash
+docker compose up web   # → http://localhost:8000
+```
+
+- **Dashboard** — live stats, ingest form.
+- **Comparison table** — pivoted view per anime; hover any ID to see the raw DB row; delete a single source row or an entire group.
+
+---
+
+## CLI (source inspection)
 
 ```bash
 docker compose run --rm --no-deps app python -m episode_id_map.cli jikan 52991
@@ -47,25 +91,57 @@ docker compose run --rm --no-deps app python -m episode_id_map.cli tvdb  424536
 docker compose run --rm --no-deps app python -m episode_id_map.cli anidb 17617
 ```
 
-| Source | Auth | Pagination | Débit appliqué |
-|---|---|---|---|
-| Jikan (MAL) | aucune | `pagination.has_next_page` | 1 req/s (burst 3) — 60/min |
-| TMDB | `api_key` (query) | par saison (pas de pages) | 15 req/s |
-| SIMKL | header `simkl-api-key` | aucune | 4 req/s |
-| TVDB | `POST /login` → Bearer | `?page=N` + `links.next` | 8 req/s |
-| AniDB | client+clientver | aucune (1 appel/anime) | **0,5 req/s + cache disque** |
+---
 
-> ⚠ **AniDB** a une politique de ban agressive : le cache (`cache/anidb/`) est
-> **obligatoire** et sert toute requête déjà vue (TTL 7 j). Ne pas forcer `--force` en
-> boucle.
+## Schema (frozen)
+
+```sql
+CREATE TABLE episode_id_map (
+    uuid             CHAR(36) NOT NULL,
+    episode_absolute CHAR(36) NOT NULL,
+    source           TEXT     NOT NULL,   -- ANIDB | MAL | SIMKL | TVDB | TMDB
+    id_franchise     TEXT,
+    id_series        TEXT,
+    id_season        TEXT,
+    id_episode       TEXT,
+    extra            JSON,
+    PRIMARY KEY (uuid),
+    UNIQUE NULLS NOT DISTINCT (source, id_series, id_season, id_episode)
+);
+```
+
+`episode_absolute` is the only cross-source key. It is assigned once and never rewritten on upsert.
+
+---
 
 ## Tests
-
-Tests unitaires (réseau **mocké** via `respx` — aucun appel réel) :
 
 ```bash
 docker compose run --rm --no-deps app sh -c "pip install -q pytest respx && pytest"
 ```
 
-Couverture : token-bucket (`ratelimit`), retry/backoff du client de base (429/5xx),
-chargement de la config, et chaque fetcher (pagination, auth, parsing AniDB + cache + ban).
+38 unit tests, network fully mocked via `respx`.
+
+---
+
+## AniDB notice
+
+AniDB enforces aggressive ban policies. The disk cache (`cache/anidb/`) is **mandatory** — every response is cached for 7 days. Do not use `--force` in a loop.
+
+---
+
+## Project layout
+
+```
+src/episode_id_map/
+├── sources/      # one client per API (auth, pagination, rate-limit)
+├── mapping/      # cluster resolution, episode alignment, UUID anchoring
+├── web/          # FastAPI app + HTMX partials
+├── templates/    # Jinja2 templates (Tailwind CSS)
+├── db.py         # connect, fetch_episode_absolute, upsert_row
+├── ingest.py     # orchestrator: resolve → fetch → align → assign → upsert
+└── cli.py        # typer commands
+
+db/init/001_schema.sql   # frozen schema, auto-run on first Postgres boot
+docs/apis/               # per-source API notes
+```
