@@ -64,10 +64,11 @@ def get_series_list(conn) -> list[SeriesSummary]:
             SELECT
                 m.id_series AS mal_series,
                 COUNT(DISTINCT m.episode_absolute) AS total_episodes,
-                COUNT(DISTINCT CASE WHEN src.n = 5 THEN m.episode_absolute END) AS full_groups
+                COUNT(DISTINCT CASE WHEN src.n = 4 THEN m.episode_absolute END) AS full_groups
             FROM episode_id_map m
             JOIN (
-                SELECT episode_absolute, COUNT(DISTINCT source) AS n
+                SELECT episode_absolute,
+                       COUNT(DISTINCT CASE WHEN source != 'ANIDB' THEN source END) AS n
                 FROM episode_id_map GROUP BY episode_absolute
             ) src USING (episode_absolute)
             WHERE m.source = 'MAL'
@@ -109,7 +110,7 @@ def _build_group(r) -> EpisodeGroup:
 _PIVOT_SQL = """
     SELECT
         episode_absolute,
-        COUNT(DISTINCT source)                                              AS source_count,
+        COUNT(DISTINCT CASE WHEN source != 'ANIDB' THEN source END)        AS source_count,
         MAX(CASE WHEN source = 'ANIDB' THEN id_episode END)                AS anidb_ep,
         MAX(CASE WHEN source = 'MAL'   THEN id_episode END)                AS mal_ep,
         MAX(CASE WHEN source = 'SIMKL' THEN id_episode END)                AS simkl_ep,

@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid as uuidlib
 from collections import Counter
 
+import httpx
 import structlog
 
 from . import db
@@ -44,65 +45,83 @@ def fetch_all(cluster: Cluster, *, settings: Settings) -> Fetched:
         with SimklClient(settings) as simkl:
             f.simkl = simkl.get_episodes(cluster.simkl_id)
 
-    if cluster.tvdb_id:
+    if cluster.tvdb_id and cluster.work_type != "movie":
         # L'ordering TVDB utilisé par SIMKL peut être "official" (S1,S2…) ou "absolute"
         # (tous les épisodes en S0Exx). On détecte depuis le mapping SIMKL pour que les
         # coordonnées (saison, épisode) soient cohérentes entre les deux sources.
-        tvdb_type = detect_tvdb_season_type(f.simkl)
-        f.tvdb_season_type = tvdb_type
-        log.info("tvdb.season_type", season_type=tvdb_type)
-        with TVDBClient(settings) as tvdb:
-            f.tvdb = list(tvdb.iter_episodes(cluster.tvdb_id, season_type=tvdb_type))
-
-    if cluster.tmdb_id:
-        with TMDBClient(settings) as tmdb:
-            episodes = list(tmdb.iter_episodes(cluster.tmdb_id))
-
-            # Stratégie external_ids :
-            #   ≤ 200 eps  → appel pour TOUS les épisodes (fiable, coût acceptable).
-            #                Nécessaire car TMDB peut avoir des dates décalées vs AniDB
-            #                pour le même épisode (ex. double-diffusion = 2 eps AniDB,
-            #                1 seul TMDB) : le pont airdate seul lierait au mauvais ep.
-            #   > 200 eps  → appel sélectif : uniquement dates absentes/non-uniques dans
-            #                AniDB ou dupliquées côté TMDB (évite 1000+ appels sur OP).
-            _EXT_THRESHOLD = 200
-            if len(episodes) <= _EXT_THRESHOLD:
-                for ep in episodes:
-                    try:
-                        ext = tmdb.get_episode_external_ids(
-                            cluster.tmdb_id, ep["season_number"], ep["episode_number"]
-                        )
-                        ep["tvdb_id"] = ext.get("tvdb_id")
-                    except Exception:  # noqa: BLE001
-                        ep["tvdb_id"] = None
-                log.info("tmdb.ext_ids.full", episodes=len(episodes))
+        # Filet de sécurité 404 : SIMKL peut renvoyer un tvdb_id de type "movie"
+        # même pour work_type="tv" (données SIMKL imprécises ou ID partagé).
+        try:
+            tvdb_type = detect_tvdb_season_type(f.simkl)
+            f.tvdb_season_type = tvdb_type
+            log.info("tvdb.season_type", season_type=tvdb_type)
+            with TVDBClient(settings) as tvdb:
+                f.tvdb = list(tvdb.iter_episodes(cluster.tvdb_id, season_type=tvdb_type))
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                log.warning("tvdb.skip_not_series", tvdb_id=cluster.tvdb_id,
+                            work_type=cluster.work_type)
             else:
-                anidb_date_count: Counter[str] = Counter(
-                    e["airdate"] for e in f.anidb if e.get("airdate")
-                )
-                tmdb_date_count: Counter[str] = Counter(
-                    (ep.get("air_date") or "")[:10]
-                    for ep in episodes if (ep.get("air_date") or "")[:10]
-                )
-                ext_ids_called = 0
-                for ep in episodes:
-                    air = (ep.get("air_date") or "")[:10]
-                    needs = (
-                        not air
-                        or anidb_date_count.get(air, 0) != 1
-                        or tmdb_date_count.get(air, 0) > 1
-                    )
-                    if needs:
+                raise
+
+    if cluster.tmdb_id and cluster.work_type != "movie":
+        # Filet de sécurité 404 : l'ID TMDB fourni par SIMKL peut pointer sur un
+        # movie TMDB (namespace distinct du TV) même si work_type="tv".
+        try:
+            with TMDBClient(settings) as tmdb:
+                episodes = list(tmdb.iter_episodes(cluster.tmdb_id))
+
+                # Stratégie external_ids :
+                #   ≤ 200 eps  → appel pour TOUS les épisodes (fiable, coût acceptable).
+                #                Nécessaire car TMDB peut avoir des dates décalées vs AniDB
+                #                pour le même épisode (ex. double-diffusion = 2 eps AniDB,
+                #                1 seul TMDB) : le pont airdate seul lierait au mauvais ep.
+                #   > 200 eps  → appel sélectif : uniquement dates absentes/non-uniques dans
+                #                AniDB ou dupliquées côté TMDB (évite 1000+ appels sur OP).
+                _EXT_THRESHOLD = 200
+                if len(episodes) <= _EXT_THRESHOLD:
+                    for ep in episodes:
                         try:
                             ext = tmdb.get_episode_external_ids(
                                 cluster.tmdb_id, ep["season_number"], ep["episode_number"]
                             )
                             ep["tvdb_id"] = ext.get("tvdb_id")
-                            ext_ids_called += 1
                         except Exception:  # noqa: BLE001
                             ep["tvdb_id"] = None
-                log.info("tmdb.ext_ids.selective", calls=ext_ids_called, episodes=len(episodes))
-            f.tmdb = episodes
+                    log.info("tmdb.ext_ids.full", episodes=len(episodes))
+                else:
+                    anidb_date_count: Counter[str] = Counter(
+                        e["airdate"] for e in f.anidb if e.get("airdate")
+                    )
+                    tmdb_date_count: Counter[str] = Counter(
+                        (ep.get("air_date") or "")[:10]
+                        for ep in episodes if (ep.get("air_date") or "")[:10]
+                    )
+                    ext_ids_called = 0
+                    for ep in episodes:
+                        air = (ep.get("air_date") or "")[:10]
+                        needs = (
+                            not air
+                            or anidb_date_count.get(air, 0) != 1
+                            or tmdb_date_count.get(air, 0) > 1
+                        )
+                        if needs:
+                            try:
+                                ext = tmdb.get_episode_external_ids(
+                                    cluster.tmdb_id, ep["season_number"], ep["episode_number"]
+                                )
+                                ep["tvdb_id"] = ext.get("tvdb_id")
+                                ext_ids_called += 1
+                            except Exception:  # noqa: BLE001
+                                ep["tvdb_id"] = None
+                    log.info("tmdb.ext_ids.selective", calls=ext_ids_called, episodes=len(episodes))
+                f.tmdb = episodes
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                log.warning("tmdb.skip_not_series", tmdb_id=cluster.tmdb_id,
+                            work_type=cluster.work_type)
+            else:
+                raise
 
     log.info(
         "fetch.done",
