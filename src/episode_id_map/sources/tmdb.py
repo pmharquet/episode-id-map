@@ -11,6 +11,7 @@ from typing import Any, Iterator
 
 from ..client import BaseClient
 from ..config import Settings
+from . import limiters
 
 
 class TMDBClient(BaseClient):
@@ -24,6 +25,7 @@ class TMDBClient(BaseClient):
             rate=4.0,   # TMDB limite à ~40 req/10s ; 4/s conservateur
             burst=8,
             params={"api_key": settings.tmdb_api_key, "language": language},
+            limiter=limiters.tmdb,
         )
 
     def get_tv(self, tv_id: int) -> dict[str, Any]:

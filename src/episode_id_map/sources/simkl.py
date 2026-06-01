@@ -10,6 +10,7 @@ from typing import Any
 
 from ..client import BaseClient
 from ..config import Settings
+from . import limiters
 
 # Services acceptés par /search/id.
 SEARCH_SERVICES = {
@@ -29,6 +30,7 @@ class SimklClient(BaseClient):
             rate=4.0,
             burst=4,
             headers={"simkl-api-key": settings.simkl_client_id},
+            limiter=limiters.simkl,
         )
 
     def search_id(self, **external_ids: Any) -> list[dict[str, Any]]:

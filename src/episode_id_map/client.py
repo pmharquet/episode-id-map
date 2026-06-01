@@ -40,8 +40,9 @@ class BaseClient:
         params: dict[str, Any] | None = None,
         timeout: float = 30.0,
         max_attempts: int = 5,
+        limiter: RateLimiter | None = None,
     ) -> None:
-        self._limiter = RateLimiter(rate, burst)
+        self._limiter = limiter if limiter is not None else RateLimiter(rate, burst)
         self._client = httpx.Client(
             base_url=base_url,
             headers=headers or {},

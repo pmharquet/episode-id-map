@@ -14,6 +14,7 @@ import httpx
 
 from ..client import BaseClient
 from ..config import Settings
+from . import limiters
 
 
 class TVDBClient(BaseClient):
@@ -22,7 +23,7 @@ class TVDBClient(BaseClient):
     def __init__(self, settings: Settings) -> None:
         if not settings.tvdb_api_key:
             raise RuntimeError("TVDB_API_KEY manquant dans .env")
-        super().__init__(settings.tvdb_base_url, rate=8.0, burst=8)
+        super().__init__(settings.tvdb_base_url, rate=8.0, burst=8, limiter=limiters.tvdb)
         self._api_key = settings.tvdb_api_key
         self._pin = settings.tvdb_pin
         self._token: str | None = None

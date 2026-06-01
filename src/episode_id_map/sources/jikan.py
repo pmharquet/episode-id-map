@@ -11,13 +11,14 @@ from typing import Any, Iterator
 
 from ..client import BaseClient
 from ..config import Settings
+from . import limiters
 
 
 class JikanClient(BaseClient):
     source = "MAL"
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__(settings.jikan_base_url, rate=1.0, burst=3)
+        super().__init__(settings.jikan_base_url, rate=1.0, burst=3, limiter=limiters.jikan)
 
     def get_anime(self, mal_id: int) -> dict[str, Any]:
         """Fiche série (`data`)."""

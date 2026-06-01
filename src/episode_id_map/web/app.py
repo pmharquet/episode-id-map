@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 import uuid as uuidlib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 from ..config import Settings
 from ..db import connect
 from ..ingest import ingest as run_ingest
+from ..sources.anidb import AniDBBanned
 from . import queries
 
 log = structlog.get_logger()
@@ -60,9 +62,14 @@ class _BatchJob:
 _jobs: dict[str, _BatchJob] = {}
 
 
+_BATCH_INTER_DELAY = 3.0  # secondes entre chaque ingest pour ménager SIMKL
+
+
 def _run_batch(job: _BatchJob, settings: Settings) -> None:
     """Exécuté dans un thread daemon ; pousse des événements dans job.queue."""
     for idx, mal_id in enumerate(job.mal_ids, start=1):
+        if idx > 1:
+            time.sleep(_BATCH_INTER_DELAY)
         try:
             stats = run_ingest(mal_id, settings=settings)
             job.queue.put({
@@ -75,6 +82,19 @@ def _run_batch(job: _BatchJob, settings: Settings) -> None:
                 "groups": stats.get("groups", 0),
                 "rows": stats.get("rows", 0),
             })
+        except AniDBBanned as exc:
+            log.error("batch.anidb_banned", mal_id=mal_id)
+            job.queue.put({
+                "type": "progress",
+                "mal_id": mal_id,
+                "status": "error",
+                "processed": idx,
+                "total": job.total,
+                "percent": round(idx / job.total * 100, 1),
+                "error": str(exc),
+            })
+            job.queue.put({"type": "banned", "source": "AniDB", "processed": idx, "total": job.total})
+            return
         except Exception as exc:  # noqa: BLE001
             job.queue.put({
                 "type": "progress",
@@ -168,12 +188,8 @@ def do_ingest(request: Request, mal_id: int = Form(...)) -> HTMLResponse:
                   {"success": True, "stats": stats, "mal_id": mal_id})
     except Exception as exc:  # noqa: BLE001
         log.warning("web.ingest.error", mal_id=mal_id, error=str(exc))
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/ingest_result.html",
-            context={"success": False, "error": str(exc), "mal_id": mal_id},
-            status_code=422,
-        )
+        return _r(request, "partials/ingest_result.html",
+                  {"success": False, "error": str(exc), "mal_id": mal_id})
 
 
 # ── Import JSON (batch) ─────────────────────────────────────────────────────────
@@ -232,7 +248,7 @@ async def stream_batch(job_id: str) -> StreamingResponse:
                 try:
                     event = job.queue.get_nowait()
                     yield f"data: {json.dumps(event)}\n\n"
-                    if event.get("type") == "done":
+                    if event.get("type") in ("done", "banned"):
                         _jobs.pop(job_id, None)
                         return
                 except Empty:

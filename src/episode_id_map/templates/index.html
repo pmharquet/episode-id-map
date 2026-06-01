@@ -178,6 +178,16 @@ async function startJsonImport() {
       etaEl.textContent = '';
       document.body.dispatchEvent(new Event('ingestDone'));
     }
+
+    if (evt.type === 'banned') {
+      clearInterval(ticker);
+      es.close();
+      pctEl.textContent = '';
+      statusEl.textContent = `⛔ Ban ${evt.source} — batch arrêté après ${evt.processed}/${evt.total} IDs. Réessayez dans quelques heures.`;
+      etaEl.textContent = '';
+      elapsedEl.textContent = 'durée totale ' + fmtDuration((Date.now() - startTime) / 1000);
+      document.body.dispatchEvent(new Event('ingestDone'));
+    }
   };
 
   es.onerror = () => {

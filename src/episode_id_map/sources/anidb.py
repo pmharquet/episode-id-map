@@ -14,6 +14,7 @@ from xml.etree import ElementTree as ET
 
 from ..client import BaseClient
 from ..config import Settings
+from . import limiters
 
 
 class AniDBError(Exception):
@@ -40,7 +41,8 @@ class AniDBClient(BaseClient):
         if not settings.anidb_client or not settings.anidb_clientver:
             raise RuntimeError("ANIDB_CLIENT / ANIDB_CLIENTVER manquants dans .env")
         # ≤ 1 req / 2 s → rate=0.5, aucune pointe.
-        super().__init__(settings.anidb_base_url, rate=0.5, burst=1, max_attempts=2)
+        super().__init__(settings.anidb_base_url, rate=0.5, burst=1, max_attempts=2,
+                         limiter=limiters.anidb)
         self._name = settings.anidb_client
         self._ver = settings.anidb_clientver
         self._cache = Path(cache_dir)
