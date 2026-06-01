@@ -113,10 +113,14 @@ async function startJsonImport() {
     return;
   }
 
-  const { job_id, total, to_process, already_mapped } = data;
+  const { job_id, total, to_process, already_mapped, simkl_remaining } = data;
 
   if (already_mapped > 0) {
     appendLog(logEl, 'slate', `↷ ${already_mapped} ID${already_mapped > 1 ? 's' : ''} déjà mappé${already_mapped > 1 ? 's' : ''} — ignoré${already_mapped > 1 ? 's' : ''}`);
+  }
+  if (simkl_remaining !== null && simkl_remaining !== undefined) {
+    const color = simkl_remaining < 100 ? 'red' : simkl_remaining < 300 ? 'amber' : 'slate';
+    appendLog(logEl, color, `SIMKL quota : ${simkl_remaining} req restantes aujourd'hui (~${Math.floor(simkl_remaining / 3)} ingests)`);
   }
 
   if (!job_id || to_process === 0) {
@@ -183,7 +187,17 @@ async function startJsonImport() {
       clearInterval(ticker);
       es.close();
       pctEl.textContent = '';
-      statusEl.textContent = `⛔ Ban ${evt.source} — batch arrêté après ${evt.processed}/${evt.total} IDs. Réessayez dans quelques heures.`;
+      statusEl.textContent = `⛔ Ban ${evt.source} — batch arrêté (${evt.processed}/${evt.total}). Réessayez dans quelques heures.`;
+      etaEl.textContent = '';
+      elapsedEl.textContent = 'durée totale ' + fmtDuration((Date.now() - startTime) / 1000);
+      document.body.dispatchEvent(new Event('ingestDone'));
+    }
+
+    if (evt.type === 'quota') {
+      clearInterval(ticker);
+      es.close();
+      pctEl.textContent = '';
+      statusEl.textContent = `⚠ Quota journalier ${evt.source} atteint (${evt.limit} req/24h) — batch arrêté après ${evt.processed}/${evt.total} IDs.`;
       etaEl.textContent = '';
       elapsedEl.textContent = 'durée totale ' + fmtDuration((Date.now() - startTime) / 1000);
       document.body.dispatchEvent(new Event('ingestDone'));
@@ -207,7 +221,7 @@ function fmtDuration(secs) {
 }
 
 function appendLog(container, color, text) {
-  const colorMap = { green: 'text-green-400', red: 'text-red-400', slate: 'text-slate-400' };
+  const colorMap = { green: 'text-green-400', red: 'text-red-400', slate: 'text-slate-400', amber: 'text-amber-400' };
   const el = document.createElement('div');
   el.className = colorMap[color] || 'text-slate-300';
   el.textContent = text;

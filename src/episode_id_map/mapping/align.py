@@ -73,19 +73,29 @@ def _int(value: object) -> int | None:
 
 def align_episodes(cluster: Cluster, f: Fetched) -> list[list[EpisodeView]]:
     """Retourne des groupes de vues ; chaque groupe = un épisode réel."""
-    # 1. Grille AniDB : epno -> airdate
+    # 1. Grille canonique : AniDB si disponible, SIMKL sinon
     grid: dict[int, date | None] = {}
     anidb_views: list[EpisodeView] = []
-    for ep in f.anidb:
-        n = _int(ep.get("epno"))
-        if n is None:
-            continue
-        ad = to_date(ep.get("airdate"))
-        grid[n] = ad
-        anidb_views.append(
-            EpisodeView("ANIDB", _s(cluster.aid), None, str(n),
-                        {"epno_type": 1}, epno=n, airdate=ad)
-        )
+    if f.anidb:
+        for ep in f.anidb:
+            n = _int(ep.get("epno"))
+            if n is None:
+                continue
+            ad = to_date(ep.get("airdate"))
+            grid[n] = ad
+            anidb_views.append(
+                EpisodeView("ANIDB", _s(cluster.aid), None, str(n),
+                            {"epno_type": 1}, epno=n, airdate=ad)
+            )
+    else:
+        # Fallback SIMKL : numérotation équivalente à AniDB pour les réguliers.
+        for ep in f.simkl:
+            if ep.get("type", "episode") != "episode":
+                continue
+            n = _int(ep.get("episode"))
+            if n is None:
+                continue
+            grid[n] = to_date(ep.get("date"))
 
     airdate_to_epnos: dict[date, list[int]] = {}
     for n, ad in grid.items():

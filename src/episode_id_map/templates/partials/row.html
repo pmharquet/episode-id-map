@@ -49,7 +49,6 @@ ea:        {{ row.episode_absolute }}{% endset %}
             hx-swap="outerHTML"
             title="Supprimer tout le groupe">×</button>
   </td>
-  {{ src_cell("ANIDB", "Ep " ~ g.anidb_ep if g.anidb_ep else "—") }}
   {{ src_cell("MAL",   "Ep " ~ g.mal_ep   if g.mal_ep   else "—") }}
   {{ src_cell("SIMKL", g.simkl_ep          if g.simkl_ep else "—") }}
   {{ src_cell("TVDB",  g.tvdb_ep            if g.tvdb_ep  else "—") }}

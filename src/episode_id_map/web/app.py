@@ -20,7 +20,9 @@ from fastapi.templating import Jinja2Templates
 from ..config import Settings
 from ..db import connect
 from ..ingest import ingest as run_ingest
+from ..ratelimit import DailyLimitExceeded
 from ..sources.anidb import AniDBBanned
+from ..sources import limiters as _limiters
 from . import queries
 
 log = structlog.get_logger()
@@ -94,6 +96,20 @@ def _run_batch(job: _BatchJob, settings: Settings) -> None:
                 "error": str(exc),
             })
             job.queue.put({"type": "banned", "source": "AniDB", "processed": idx, "total": job.total})
+            return
+        except DailyLimitExceeded as exc:
+            log.warning("batch.daily_limit", source=exc.source, mal_id=mal_id)
+            job.queue.put({
+                "type": "progress",
+                "mal_id": mal_id,
+                "status": "error",
+                "processed": idx,
+                "total": job.total,
+                "percent": round(idx / job.total * 100, 1),
+                "error": str(exc),
+            })
+            job.queue.put({"type": "quota", "source": exc.source, "limit": exc.limit,
+                           "processed": idx, "total": job.total})
             return
         except Exception as exc:  # noqa: BLE001
             job.queue.put({
@@ -213,12 +229,15 @@ async def ingest_json(file: UploadFile = File(...)) -> JSONResponse:
     to_process = [x for x in mal_ids if x not in already]
     already_mapped = len(mal_ids) - len(to_process)
 
+    simkl_remaining = _limiters.simkl.daily_remaining
+
     if not to_process:
         return JSONResponse({
             "job_id": None,
             "total": len(mal_ids),
             "to_process": 0,
             "already_mapped": already_mapped,
+            "simkl_remaining": simkl_remaining,
         })
 
     job_id = str(uuidlib.uuid4())
@@ -233,6 +252,7 @@ async def ingest_json(file: UploadFile = File(...)) -> JSONResponse:
         "total": len(mal_ids),
         "to_process": len(to_process),
         "already_mapped": already_mapped,
+        "simkl_remaining": simkl_remaining,
     })
 
 
@@ -248,7 +268,7 @@ async def stream_batch(job_id: str) -> StreamingResponse:
                 try:
                     event = job.queue.get_nowait()
                     yield f"data: {json.dumps(event)}\n\n"
-                    if event.get("type") in ("done", "banned"):
+                    if event.get("type") in ("done", "banned", "quota"):
                         _jobs.pop(job_id, None)
                         return
                 except Empty:

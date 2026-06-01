@@ -36,4 +36,69 @@
   {% include "partials/episodes_table.html" %}
 </div>
 
+<script>
+let _sortCol = null, _sortDir = 1;
+
+function sortEpisodes(colIdx, type) {
+  _sortDir = _sortCol === colIdx ? -_sortDir : 1;
+  _sortCol = colIdx;
+
+  const tbody = document.querySelector('#episodes-table tbody');
+  if (!tbody) return;
+
+  const rows = [...tbody.querySelectorAll('tr')];
+  rows.sort((a, b) => {
+    const ka = _cellKey(a.cells[colIdx], type);
+    const kb = _cellKey(b.cells[colIdx], type);
+    if (ka === kb) return 0;
+    return (ka < kb ? -1 : 1) * _sortDir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  _updateIndicators(colIdx);
+}
+
+function _cellKey(cell, type) {
+  if (!cell) return type === 'text' ? '￿' : Infinity;
+  const tip = cell.querySelector('.tip');
+  const text = (tip ? tip.textContent : cell.textContent).trim();
+
+  if (!text || text === '—') return type === 'text' ? '￿' : Infinity;
+
+  if (type === 'ep') {
+    const m = text.match(/\d+/);
+    return m ? parseInt(m[0]) : Infinity;
+  }
+  if (type === 'se') {
+    const m = text.match(/S(\d+)E(\d+)/i);
+    return m ? parseInt(m[1]) * 100000 + parseInt(m[2]) : Infinity;
+  }
+  if (type === 'badge') {
+    const m = text.match(/(\d+)\/\d+/);
+    return m ? parseInt(m[1]) : 0;
+  }
+  return text;
+}
+
+function _updateIndicators(activeCol) {
+  document.querySelectorAll('.sort-indicator').forEach(el => {
+    el.textContent = '⇅';
+    el.classList.remove('text-blue-400');
+    el.classList.add('opacity-40');
+  });
+  const active = document.querySelector(`.sort-indicator[data-col="${activeCol}"]`);
+  if (active) {
+    active.textContent = _sortDir === 1 ? '↑' : '↓';
+    active.classList.remove('opacity-40');
+    active.classList.add('text-blue-400');
+  }
+}
+
+document.addEventListener('htmx:afterSwap', e => {
+  if (e.detail.target.id === 'episodes-table') {
+    _sortCol = null;
+    _sortDir = 1;
+  }
+});
+</script>
+
 {% endblock %}

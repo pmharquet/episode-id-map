@@ -17,7 +17,7 @@ from .mapping.align import align_episodes, detect_tvdb_season_type
 from .mapping.anchor import assign_absolute
 from .mapping.cluster import resolve_cluster
 from .models import Cluster, Fetched, Row
-from .sources.anidb import AniDBClient
+from .sources.anidb import AniDBBanned, AniDBClient, AniDBError
 from .sources.jikan import JikanClient
 from .sources.simkl import SimklClient
 from .sources.tmdb import TMDBClient
@@ -30,8 +30,11 @@ def fetch_all(cluster: Cluster, *, settings: Settings) -> Fetched:
     f = Fetched()
 
     if cluster.aid:
-        with AniDBClient(settings) as anidb:
-            f.anidb = anidb.regular_episodes(anidb.get_anime(cluster.aid))
+        try:
+            with AniDBClient(settings) as anidb:
+                f.anidb = anidb.regular_episodes(anidb.get_anime(cluster.aid))
+        except (AniDBBanned, AniDBError) as exc:
+            log.warning("anidb.skip", aid=cluster.aid, reason=str(exc))
 
     if cluster.mal_id:
         with JikanClient(settings) as jikan:
