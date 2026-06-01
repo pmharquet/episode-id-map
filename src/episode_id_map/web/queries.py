@@ -73,7 +73,7 @@ def get_series_list(conn) -> list[SeriesSummary]:
             ) src USING (episode_absolute)
             WHERE m.source = 'MAL'
             GROUP BY m.id_series
-            ORDER BY m.id_series
+            ORDER BY m.id_series::bigint
             """
         )
         return [SeriesSummary(*row) for row in cur.fetchall()]
